@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
-import { Card, Form, Input, Button } from 'antd';
+import { Card, Form, Input, Select, Button } from 'antd';
 import { flatten, cloneDeep, get, omit, isEqual, isUndefined, debounce, merge } from 'lodash';
 import { setAsyncState, classNames } from '@nbfe/tools';
 import './index.css';
@@ -58,7 +58,7 @@ class Index extends Component {
 
     async componentDidMount() {
         const columns = cloneDeep(this.props.columns).map((v, i) => {
-            const column = merge(defaultColumn, v);
+            const column = merge({}, defaultColumn, v);
             const {
                 label,
                 template: { tpl }
@@ -66,7 +66,6 @@ class Index extends Component {
             if (tpl === 'input') {
                 column.placeholder = label ? ['请输入', label].join('') : '';
             }
-            // placeholder: label ? ['请输入', label].join('') : '',
             return column;
         });
         await setAsyncState(this, { columns });
@@ -94,15 +93,24 @@ class Index extends Component {
         return {
             renderColumns: () => {
                 return this.state.columns.map((v, i) => {
-                    const {
-                        label,
-                        prop,
-                        visible,
-                        template: { tpl }
-                    } = v;
+                    const { label, prop, visible, defaultValue, template } = v;
+                    const { tpl, ...restProps } = template;
+                    console.log(template, tpl);
                     let formItemNode = null;
                     if (tpl === 'input') {
-                        formItemNode = <Input />;
+                        formItemNode = <Input defaultValue={defaultValue} {...restProps} style={{ width: 120 }} />;
+                    }
+                    if (tpl === 'select') {
+                        const { data = [] } = template;
+                        formItemNode = (
+                            <Select defaultValue={defaultValue} style={{ width: 120 }}>
+                                {data.map((v2, i2) => {
+                                    const {value, label} = v2;
+                                    const key = [i2, label, value].join('_');
+                                    return <Select.Option value={value} key={key}>{label}</Select.Option>;
+                                })}
+                            </Select>
+                        );
                     }
                     const key = [i, label, prop].join('_');
                     return (
@@ -115,8 +123,8 @@ class Index extends Component {
             renderSearchReset: () => {
                 const { state, domEvents, renderResult } = this;
                 const { onSearch, onReset } = domEvents;
-                const { showSearchBtn, showResetBtn } = this.state;
-                if (isAllTruthy(showSearchBtn, showResetBtn)) {
+                const { showSearchBtn, showResetBtn } = this.props;
+                if (isAllFalsy(showSearchBtn, showResetBtn)) {
                     return null;
                 }
                 const btns = [];
