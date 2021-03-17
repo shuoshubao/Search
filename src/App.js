@@ -2,17 +2,22 @@ import Search from './Search';
 
 const columns = [
     {
+        label: '隐藏',
+        prop: 'visibility',
+        visible: false
+    },
+    {
         label: 'test',
-        prop: 'test',
+        prop: 'a'
     },
     {
         label: '姓名',
-        prop: 'a',
-        defaultValue: 'aa'
+        prop: 'b',
+        defaultValue: 'bb'
     },
     {
         label: '性别',
-        prop: 'b',
+        prop: 'c',
         template: {
             tpl: 'select',
             data: [
@@ -22,19 +27,37 @@ const columns = [
         }
     },
     {
-        label: '创建时间',
-        prop: 'c',
+        label: '创建时间-日',
+        prop: 'd',
+        template: {
+            tpl: 'date-picker'
+        }
+    },
+    {
+        label: '创建时间-日-时分',
+        prop: 'd1',
         template: {
             tpl: 'date-picker',
-
+            format: 'YYYY-MM-DD HH:mm',
+            showTime: true
+        }
+    },
+    {
+        label: '创建时间-月',
+        prop: 'd2',
+        template: {
+            tpl: 'date-picker',
+            picker: 'month'
         }
     },
     {
         label: '时间区间',
-        prop: 'd',
+        prop: 'e',
         template: {
             tpl: 'range-picker',
-
+            format: 'YYYY-MM-DD HH:mm',
+            startTimeKey: 'sTime',
+            endTimeKey: 'eTime'
         }
     }
 ];

@@ -1,36 +1,14 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
-import { Card, Form, Input, Select, Button } from 'antd';
-import { flatten, cloneDeep, get, omit, isEqual, isUndefined, debounce, merge } from 'lodash';
-import { setAsyncState, classNames } from '@nbfe/tools';
-import './index.css';
+import { Card, Button, Form, Input, Select, DatePicker } from 'antd';
+import { omit } from 'lodash';
+import { mergeColumns, getInitialValues, getSearchValues, isEveryFalsy } from './config';
+import './index.scss';
 
-const isAllTruthy = (...args) => {
-    return flatten(args).every(Boolean);
-};
-const isAllFalsy = (...args) => {
-    return flatten(args).every(v => !Boolean(v));
-};
-
-const defaultColumn = {
-    label: '',
-    prop: '',
-    visible: true,
-    defaultValue: '',
-    immediate: true,
-    tips: '',
-    placeholder: '',
-    isSearch: false,
-    inline: true,
-    style: {},
-    formItemStyle: {},
-    template: {
-        tpl: 'input'
-    }
-};
+const { RangePicker } = DatePicker;
 
 class Index extends Component {
-    static displayName = 'Search';
+    static displayName = 'DynaSearch';
 
     static defaultProps = {
         autoSubmit: true,
@@ -48,7 +26,8 @@ class Index extends Component {
     constructor(props) {
         super(props);
         this.state = {
-            columns: []
+            columns: [],
+            initialValues: {}
         };
         this.formRef = React.createRef();
         this.customEvents = this.getCustomEvents();
@@ -57,18 +36,10 @@ class Index extends Component {
     }
 
     async componentDidMount() {
-        const columns = cloneDeep(this.props.columns).map((v, i) => {
-            const column = merge({}, defaultColumn, v);
-            const {
-                label,
-                template: { tpl }
-            } = column;
-            if (tpl === 'input') {
-                column.placeholder = label ? ['请输入', label].join('') : '';
-            }
-            return column;
-        });
-        await setAsyncState(this, { columns });
+        const columns = mergeColumns(this.props.columns);
+        // 初始值
+        const initialValues = getInitialValues(columns);
+        this.setState({ columns, initialValues });
     }
 
     getCustomEvents() {
@@ -79,8 +50,11 @@ class Index extends Component {
         return {
             // 查询
             onSearch: () => {
+                const { state } = this;
+                const { columns } = state;
                 const params = this.formRef.current.getFieldsValue();
                 console.log(params);
+                console.log(getSearchValues(params, columns));
             },
             // 重置
             onReset: () => {
@@ -92,29 +66,51 @@ class Index extends Component {
     getRenderResult() {
         return {
             renderColumns: () => {
-                return this.state.columns.map((v, i) => {
-                    const { label, prop, visible, defaultValue, template } = v;
-                    const { tpl, ...restProps } = template;
-                    console.log(template, tpl);
+                const { state } = this;
+                const { columns } = state;
+                return columns.map((v, i) => {
+                    const { label, prop, template } = v;
+                    const { tpl, width, ...restProps } = template;
                     let formItemNode = null;
+                    let formItemName = prop;
+                    // Input
                     if (tpl === 'input') {
-                        formItemNode = <Input defaultValue={defaultValue} {...restProps} style={{ width: 120 }} />;
+                        const formItemNodeProps = restProps;
+                        formItemNode = <Input {...formItemNodeProps} style={{ width }} />;
                     }
+                    // Select
                     if (tpl === 'select') {
+                        const formItemNodeProps = restProps;
                         const { data = [] } = template;
                         formItemNode = (
-                            <Select defaultValue={defaultValue} style={{ width: 120 }}>
+                            <Select {...formItemNodeProps} style={{ width }}>
                                 {data.map((v2, i2) => {
-                                    const {value, label} = v2;
+                                    const { value, label } = v2;
                                     const key = [i2, label, value].join('_');
-                                    return <Select.Option value={value} key={key}>{label}</Select.Option>;
+                                    return (
+                                        <Select.Option value={value} key={key}>
+                                            {label}
+                                        </Select.Option>
+                                    );
                                 })}
                             </Select>
                         );
                     }
-                    const key = [i, label, prop].join('_');
+                    // DatePicker
+                    if (tpl === 'date-picker') {
+                        const formItemNodeProps = restProps;
+                        console.log(111, restProps);
+                        formItemNode = <DatePicker {...formItemNodeProps} style={{ width }} />;
+                    }
+                    // RangePicker
+                    if (tpl === 'range-picker') {
+                        const formItemNodeProps = omit(restProps, ['startTimeKey', 'endTimeKey']);
+                        console.log(222, restProps);
+                        formItemNode = <RangePicker {...formItemNodeProps} style={{ width }} />;
+                    }
+                    const key = [i, label, prop || formItemName].join('_');
                     return (
-                        <Form.Item label={label} name={prop} key={key}>
+                        <Form.Item label={label} name={formItemName} key={key}>
                             {formItemNode}
                         </Form.Item>
                     );
@@ -124,20 +120,20 @@ class Index extends Component {
                 const { state, domEvents, renderResult } = this;
                 const { onSearch, onReset } = domEvents;
                 const { showSearchBtn, showResetBtn } = this.props;
-                if (isAllFalsy(showSearchBtn, showResetBtn)) {
+                if (isEveryFalsy(showSearchBtn, showResetBtn)) {
                     return null;
                 }
                 const btns = [];
                 if (showSearchBtn) {
                     btns.push(
-                        <Button type="primary" htmlType="submit">
+                        <Button type="primary" htmlType="submit" key="submit">
                             查询
                         </Button>
                     );
                 }
                 if (showResetBtn) {
                     btns.push(
-                        <Button style={{ marginLeft: 5 }} onClick={onReset}>
+                        <Button style={{ marginLeft: 5 }} onClick={onReset} key="reset">
                             重置
                         </Button>
                     );
@@ -149,11 +145,14 @@ class Index extends Component {
 
     render() {
         const { state, domEvents, renderResult } = this;
-        const { columns } = state;
+        const { columns, initialValues } = state;
         const { onSearch, onReset } = domEvents;
+        if (!columns.length) {
+            return null;
+        }
         return (
-            <Card size="small">
-                <Form layout="inline" ref={this.formRef} onFinish={onSearch}>
+            <Card size="small" className="dyna-search-container" bordered={false}>
+                <Form layout="inline" ref={this.formRef} onFinish={onSearch} initialValues={initialValues}>
                     {renderResult.renderColumns()}
                     {renderResult.renderSearchReset()}
                 </Form>
