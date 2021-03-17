@@ -1,7 +1,10 @@
-import { Button } from 'antd';
 import Search from './Search';
 
 const columns = [
+    {
+        label: 'test',
+        prop: 'test',
+    },
     {
         label: '姓名',
         prop: 'a',
@@ -10,7 +13,6 @@ const columns = [
     {
         label: '性别',
         prop: 'b',
-        defaultValue: 2,
         template: {
             tpl: 'select',
             data: [
@@ -18,12 +20,28 @@ const columns = [
                 { label: '女', value: 2 }
             ]
         }
+    },
+    {
+        label: '创建时间',
+        prop: 'c',
+        template: {
+            tpl: 'date-picker',
+
+        }
+    },
+    {
+        label: '时间区间',
+        prop: 'd',
+        template: {
+            tpl: 'range-picker',
+
+        }
     }
 ];
 
 const App = () => {
     return (
-        <div className="App">
+        <div className="App" style={{ padding: 10, background: '#edf0f3' }}>
             <Search columns={columns} />
         </div>
     );
