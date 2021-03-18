@@ -1,8 +1,18 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { Card, Button, Form, Input, Select, DatePicker } from 'antd';
-import { omit } from 'lodash';
-import { mergeColumns, getInitialValues, getSearchValues, isEveryFalsy } from './config';
+import { isFunction, omit, merge } from 'lodash';
+import { isEmptyArray, setAsyncState } from '@nbfe/tools';
+import { defaulCardProps, defaulFormProps } from './config';
+import {
+    isEveryFalsy,
+    mergeColumns,
+    getInitialValues,
+    getSearchValues,
+    getFormItemLabelWidth,
+    renderFormItemLabel,
+    getFormItemNodeStyle
+} from './util';
 import './index.scss';
 
 const { RangePicker } = DatePicker;
@@ -13,14 +23,28 @@ class Index extends Component {
     static defaultProps = {
         autoSubmit: true,
         showSearchBtn: true,
-        showResetBtn: true
+        showResetBtn: true,
+        cardProps: {},
+        formProps: {},
+        labelWidth: 0
     };
 
     static propTypes = {
         columns: PropTypes.array.isRequired,
+        // 自动触发搜索
         autoSubmit: PropTypes.bool,
+        // 展示搜索按钮
         showSearchBtn: PropTypes.bool,
-        showResetBtn: PropTypes.bool
+        // 展示重置按钮
+        showResetBtn: PropTypes.bool,
+        // 事件: 提交 (submitData, formData) => {}
+        onSubmit: PropTypes.func,
+        // Card 的属性 https://ant.design/components/card-cn/#API
+        cardProps: PropTypes.object,
+        // Form 的属性 https://ant.design/components/form-cn/#API
+        formProps: PropTypes.object,
+        // Form.Item label 的宽度
+        labelWidth: PropTypes.number
     };
 
     constructor(props) {
@@ -36,10 +60,17 @@ class Index extends Component {
     }
 
     async componentDidMount() {
-        const columns = mergeColumns(this.props.columns);
+        const { columns, autoSubmit } = this.props;
+        const innerColumns = mergeColumns(columns);
         // 初始值
-        const initialValues = getInitialValues(columns);
-        this.setState({ columns, initialValues });
+        const initialValues = getInitialValues(innerColumns);
+        await setAsyncState(this, { columns: innerColumns, initialValues });
+        if (isEmptyArray(innerColumns)) {
+            return;
+        }
+        if (autoSubmit) {
+            this.domEvents.onSearch();
+        }
     }
 
     getCustomEvents() {
@@ -50,11 +81,13 @@ class Index extends Component {
         return {
             // 查询
             onSearch: () => {
-                const { state } = this;
+                const { state, props } = this;
                 const { columns } = state;
                 const params = this.formRef.current.getFieldsValue();
-                console.log(params);
                 console.log(getSearchValues(params, columns));
+                if (isFunction(props.onSubmit)) {
+                    props.onSubmit(getSearchValues(params, columns), params);
+                }
             },
             // 重置
             onReset: () => {
@@ -66,24 +99,24 @@ class Index extends Component {
     getRenderResult() {
         return {
             renderColumns: () => {
-                const { state } = this;
+                const { props, state } = this;
                 const { columns } = state;
+                const labelWidth = props.labelWidth || getFormItemLabelWidth(columns);
                 return columns.map((v, i) => {
-                    const { label, prop, template } = v;
-                    const { tpl, width, ...restProps } = template;
+                    const { label, prop, placeholder, template } = v;
+                    const { tpl } = template;
+                    let formItemNodeProps = { placeholder, ...omit(template, ['tpl', 'width']) };
                     let formItemNode = null;
                     let formItemName = prop;
                     // Input
                     if (tpl === 'input') {
-                        const formItemNodeProps = restProps;
-                        formItemNode = <Input {...formItemNodeProps} style={{ width }} />;
+                        formItemNode = <Input {...formItemNodeProps} style={getFormItemNodeStyle(v)} />;
                     }
                     // Select
                     if (tpl === 'select') {
-                        const formItemNodeProps = restProps;
                         const { data = [] } = template;
                         formItemNode = (
-                            <Select {...formItemNodeProps} style={{ width }}>
+                            <Select {...formItemNodeProps} style={getFormItemNodeStyle(v)}>
                                 {data.map((v2, i2) => {
                                     const { value, label } = v2;
                                     const key = [i2, label, value].join('_');
@@ -98,27 +131,27 @@ class Index extends Component {
                     }
                     // DatePicker
                     if (tpl === 'date-picker') {
-                        const formItemNodeProps = restProps;
-                        console.log(111, restProps);
-                        formItemNode = <DatePicker {...formItemNodeProps} style={{ width }} />;
+                        formItemNode = <DatePicker {...formItemNodeProps} style={getFormItemNodeStyle(v)} />;
                     }
                     // RangePicker
                     if (tpl === 'range-picker') {
-                        const formItemNodeProps = omit(restProps, ['startTimeKey', 'endTimeKey']);
-                        console.log(222, restProps);
-                        formItemNode = <RangePicker {...formItemNodeProps} style={{ width }} />;
+                        formItemNodeProps = omit(formItemNodeProps, ['startTimeKey', 'endTimeKey']);
+                        formItemNode = <RangePicker {...formItemNodeProps} style={getFormItemNodeStyle(v)} />;
                     }
+
+                    const labelNode = renderFormItemLabel(v, { labelWidth });
+
                     const key = [i, label, prop || formItemName].join('_');
                     return (
-                        <Form.Item label={label} name={formItemName} key={key}>
+                        <Form.Item label={labelNode} name={formItemName} key={key}>
                             {formItemNode}
                         </Form.Item>
                     );
                 });
             },
             renderSearchReset: () => {
-                const { state, domEvents, renderResult } = this;
-                const { onSearch, onReset } = domEvents;
+                const { domEvents } = this;
+                const { onReset } = domEvents;
                 const { showSearchBtn, showResetBtn } = this.props;
                 if (isEveryFalsy(showSearchBtn, showResetBtn)) {
                     return null;
@@ -144,15 +177,22 @@ class Index extends Component {
     }
 
     render() {
-        const { state, domEvents, renderResult } = this;
+        const { props, state, domEvents, renderResult } = this;
         const { columns, initialValues } = state;
-        const { onSearch, onReset } = domEvents;
-        if (!columns.length) {
+        const { onSearch } = domEvents;
+        if (isEmptyArray(columns)) {
             return null;
         }
+        const cardProps = merge({}, props.cardProps, defaulCardProps);
+        const formProps = merge({}, props.formProps, defaulFormProps);
         return (
-            <Card size="small" className="dyna-search-container" bordered={false}>
-                <Form layout="inline" ref={this.formRef} onFinish={onSearch} initialValues={initialValues}>
+            <Card className="dyna-search-container" {...cardProps}>
+                <Form
+                    {...omit(formProps, ['ref', 'onFinish', 'initialValues'])}
+                    ref={this.formRef}
+                    onFinish={onSearch}
+                    initialValues={initialValues}
+                >
                     {renderResult.renderColumns()}
                     {renderResult.renderSearchReset()}
                 </Form>
