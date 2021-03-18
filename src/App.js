@@ -7,19 +7,17 @@ const columns = [
         visible: false
     },
     {
-        label: 'test',
-        prop: 'a'
-    },
-    {
         label: '姓名',
         prop: 'b',
-        defaultValue: 'bb'
+        tooltip: ['这里填写姓名', 'a[a|https://ke.com]b']
     },
     {
         label: '性别',
         prop: 'c',
+        defaultValue: 2,
         template: {
             tpl: 'select',
+            allowClear: true,
             data: [
                 { label: '男', value: 1 },
                 { label: '女', value: 2 }
@@ -27,14 +25,15 @@ const columns = [
         }
     },
     {
-        label: '创建时间-日',
+        label: '创建时间1',
         prop: 'd',
+        tooltip: '创建时间1',
         template: {
             tpl: 'date-picker'
         }
     },
     {
-        label: '创建时间-日-时分',
+        label: '创建时间2',
         prop: 'd1',
         template: {
             tpl: 'date-picker',
@@ -43,8 +42,17 @@ const columns = [
         }
     },
     {
-        label: '创建时间-月',
+        label: '创建时间3',
         prop: 'd2',
+        template: {
+            tpl: 'date-picker',
+            format: 'YYYY-MM-DD HH:mm:ss',
+            showTime: true
+        }
+    },
+    {
+        label: '创建时间4',
+        prop: 'd3',
         template: {
             tpl: 'date-picker',
             picker: 'month'
@@ -55,7 +63,7 @@ const columns = [
         prop: 'e',
         template: {
             tpl: 'range-picker',
-            format: 'YYYY-MM-DD HH:mm',
+            format: 'YYYY-MM-DD HH:mm:ss',
             startTimeKey: 'sTime',
             endTimeKey: 'eTime'
         }
