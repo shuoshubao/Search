@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { Card, Button, Form, Input, Select, DatePicker, Radio, Checkbox, Cascader } from 'antd';
 import { debounce, isFunction, omit, merge } from 'lodash';
 import { isEmptyArray, setAsyncState, isEveryFalsy } from '@nbfe/tools';
-import Switch from './Switch';
+import Switch from './Switch.jsx';
 import { defaulCardProps, defaulFormProps } from './config';
 import {
     mergeColumns,
@@ -12,7 +12,7 @@ import {
     getFormItemLabelWidth,
     renderFormItemLabel,
     getFormItemNodeProps
-} from './util';
+} from './util.jsx';
 import './index.scss';
 
 const { RangePicker } = DatePicker;
