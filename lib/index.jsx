@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
-import { cloneDeep, debounce, isFunction, omit, merge } from 'lodash';
+import { cloneDeep, debounce, isFunction, omit, pick, merge } from 'lodash';
 import { isEmptyArray, setAsyncState, isEveryFalsy, classNames } from '@nbfe/tools';
 import {
     Card,
@@ -17,6 +17,7 @@ import {
     message
 } from './antd';
 import Input from './Input.jsx';
+import RangeNumber from './RangeNumber.jsx';
 import Tabs from './Tabs.jsx';
 import Switch from './Switch.jsx';
 import FilterPanel from './FilterPanel.jsx';
@@ -25,6 +26,7 @@ import {
     getClassNames,
     validateColumns,
     mergeColumns,
+    injectColumnsWithRemoteConfig,
     getInitialValues,
     getSearchValues,
     getFormItemLabelWidth,
@@ -83,6 +85,7 @@ class Index extends Component {
         const { columns, autoSubmit } = this.props;
         const innerColumns = mergeColumns(columns);
         validateColumns(innerColumns);
+        injectColumnsWithRemoteConfig(this, innerColumns);
         // 初始值
         const initialValues = getInitialValues(innerColumns);
         await setAsyncState(this, { columns: innerColumns, initialValues });
@@ -145,6 +148,9 @@ class Index extends Component {
         const { state, props } = this;
         const { columns } = state;
         const formRefNode = this.getFormRefNode();
+        if (!formRefNode) {
+            return;
+        }
         const params = formRefNode.getFieldsValue();
         const searchValues = getSearchValues(params, columns);
         if (isFunction(props.onSubmit)) {
@@ -249,11 +255,13 @@ class Index extends Component {
 
             // Select
             if (tpl === 'select') {
+                const { options, allItem } = formItemNodeProps;
                 formItemNode = (
-                    <Select {...omit(formItemNodeProps, ['options'])}>
-                        {formItemNodeProps.options.map(v => {
+                    <Select {...omit(formItemNodeProps, ['options', 'allItem', 'remoteConfig'])}>
+                        {[allItem, ...options].filter(Boolean).map(v => {
+                            const optionProps = pick(v, ['className', 'disabled', 'title', 'value']);
                             return (
-                                <Select.Option value={v.value} key={v.value}>
+                                <Select.Option key={v.value} {...optionProps}>
                                     {v.label}
                                 </Select.Option>
                             );
@@ -284,7 +292,19 @@ class Index extends Component {
 
             // Tabs
             if (tpl === 'tabs') {
-                formItemNode = <Tabs column={v} {...formItemNodeProps} />;
+                const { emitReset = false } = formItemNodeProps;
+                formItemNode = (
+                    <Tabs
+                        column={v}
+                        {...omit(formItemNodeProps, ['emitReset'])}
+                        onCustomChange={() => {
+                            // 触发重置, 清空其他条件
+                            if (emitReset) {
+                                this.onReset();
+                            }
+                        }}
+                    />
+                );
             }
 
             // DatePicker
@@ -295,6 +315,11 @@ class Index extends Component {
             // RangePicker
             if (tpl === 'range-picker') {
                 formItemNode = <DatePicker.RangePicker {...formItemNodeProps} />;
+            }
+
+            // RangeNumber 数字范围
+            if (tpl === 'range-number') {
+                formItemNode = <RangeNumber column={v} {...formItemNodeProps} />;
             }
 
             // Switch
@@ -308,7 +333,6 @@ class Index extends Component {
                 formItemNode = <DynamicComponent {...formItemNodeProps} />;
             }
 
-            // const { label, name, inline, template } = v;
             const formItemProps = getFormItemProps(v, { index: i, labelWidth });
 
             if (isAntdV3) {
@@ -393,6 +417,27 @@ class Index extends Component {
             formProps.onFinish = onSearch;
             formProps.initialValues = initialValues;
             formProps.ref = this.formRef;
+            if (props.onValuesChange) {
+                formProps.onValuesChange = (changedFields, allFields) => {
+                    const formRefNode = this.getFormRefNode();
+                    const [[key, value]] = Object.entries(changedFields);
+                    props.onValuesChange(
+                        {
+                            key,
+                            value,
+                            changedFields: cloneDeep(changedFields),
+                            allFields: cloneDeep(allFields)
+                        },
+                        {
+                            columns: cloneDeep(columns),
+                            updateColumns: list => {
+                                this.setState({ columns: list });
+                            },
+                            ...formRefNode
+                        }
+                    );
+                };
+            }
         }
         return (
             <Card className={getClassNames('container')} {...cardProps}>
